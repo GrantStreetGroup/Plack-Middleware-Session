@@ -25,41 +25,63 @@ CREATE TABLE sessions (
 );
 EOSQL
 
-t::lib::TestSession::run_all_tests(
-    store  => Plack::Session::Store::DBI->new( dbh => $dbh ),
-    state  => Plack::Session::State->new,
-    env_cb => sub {
-        open my $in, '<', \do { my $d };
-        my $env = {
-            'psgi.version'    => [ 1, 0 ],
-            'psgi.input'      => $in,
-            'psgi.errors'     => *STDERR,
-            'psgi.url_scheme' => 'http',
-            SERVER_PORT       => 80,
-            REQUEST_METHOD    => 'GET',
-            QUERY_STRING      => join "&" => map { $_ . "=" . $_[0]->{ $_ } } keys %{$_[0] || +{}},
-        };
-    },
+tests_per_dbh($dbh);
+
+my $file2 = File::Spec->catfile($tmp, "006_basic_w_dbi_store.db");
+my $dbh2  = DBI->connect( "dbi:SQLite:$file2", undef, undef, {RaiseError => 1, AutoCommit => 1} );
+$dbh2->do(<<EOSQL2);
+CREATE TABLE sessions_options (
+    session_id CHAR(72) PRIMARY KEY,
+    session_stash TEXT
+);
+EOSQL2
+
+tests_per_dbh($dbh2,
+    table_name  => 'sessions_options',
+    id_column   => 'session_id',
+    data_column => 'session_stash',
 );
 
-t::lib::TestSession::run_all_tests(
-    store  => Plack::Session::Store::DBI->new( get_dbh => sub { $dbh }  ),
-    state  => Plack::Session::State->new,
-    env_cb => sub {
-        open my $in, '<', \do { my $d };
-        my $env = {
-            'psgi.version'    => [ 1, 0 ],
-            'psgi.input'      => $in,
-            'psgi.errors'     => *STDERR,
-            'psgi.url_scheme' => 'http',
-            SERVER_PORT       => 80,
-            REQUEST_METHOD    => 'GET',
-            QUERY_STRING      => join "&" => map { $_ . "=" . $_[0]->{ $_ } } keys %{$_[0] || +{}},
-        };
-    },
-);
+sub tests_per_dbh {
+    my ($dbh, %store_opts) = shift;
+
+    t::lib::TestSession::run_all_tests(
+        store  => Plack::Session::Store::DBI->new( dbh => $dbh, %store_opts ),
+        state  => Plack::Session::State->new,
+        env_cb => sub {
+            open my $in, '<', \do { my $d };
+            my $env = {
+                'psgi.version'    => [ 1, 0 ],
+                'psgi.input'      => $in,
+                'psgi.errors'     => *STDERR,
+                'psgi.url_scheme' => 'http',
+                SERVER_PORT       => 80,
+                REQUEST_METHOD    => 'GET',
+                QUERY_STRING      => join "&" => map { $_ . "=" . $_[0]->{ $_ } } keys %{$_[0] || +{}},
+            };
+        },
+    );
+
+    t::lib::TestSession::run_all_tests(
+        store  => Plack::Session::Store::DBI->new( get_dbh => sub { $dbh }, %store_opts  ),
+        state  => Plack::Session::State->new,
+        env_cb => sub {
+            open my $in, '<', \do { my $d };
+            my $env = {
+                'psgi.version'    => [ 1, 0 ],
+                'psgi.input'      => $in,
+                'psgi.errors'     => *STDERR,
+                'psgi.url_scheme' => 'http',
+                SERVER_PORT       => 80,
+                REQUEST_METHOD    => 'GET',
+                QUERY_STRING      => join "&" => map { $_ . "=" . $_[0]->{ $_ } } keys %{$_[0] || +{}},
+            };
+        },
+    );
 
 
-$dbh->disconnect;
+    $dbh->disconnect;
+}
+
 
 done_testing;
