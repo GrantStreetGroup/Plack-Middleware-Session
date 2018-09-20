@@ -29,17 +29,20 @@ tests_per_dbh($dbh);
 
 my $file2 = File::Spec->catfile($tmp, "006_basic_w_dbi_store.db");
 my $dbh2  = DBI->connect( "dbi:SQLite:$file2", undef, undef, {RaiseError => 1, AutoCommit => 1} );
+# Building the table with these weird names will simultaneously prove that we
+# accept custom table and column names while also demonstrating that we do
+# quoting correctly, which the previous code did not.
 $dbh2->do(<<EOSQL2);
-CREATE TABLE sessions_options (
-    session_id CHAR(72) PRIMARY KEY,
-    session_stash TEXT
+CREATE TABLE 'insert' (
+    'where' CHAR(72) PRIMARY KEY,
+    'set' TEXT
 );
 EOSQL2
 
 tests_per_dbh($dbh2,
-    table_name  => 'sessions_options',
-    id_column   => 'session_id',
-    data_column => 'session_stash',
+    table_name  => 'insert',
+    id_column   => 'where',
+    data_column => 'set',
 );
 
 sub tests_per_dbh {
